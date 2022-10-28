@@ -17,6 +17,7 @@ const videoId = computed(() : string => {
     return matches && matches.length ? matches[1] : "";
 });
 const listening = ref(false)
+const playing = ref(false)
 const interval = ref(0)
 const timeout = ref(0) 
 const volume = ref(0)
@@ -33,6 +34,7 @@ async function startListeningMic() {
   }
   const player = playerNode.value.player;
   listening.value = true
+  playing.value = false
   try {
     wakeLock = await (navigator as any).wakeLock.request('screen');
   } catch(e) {
@@ -65,6 +67,7 @@ function stopListeningMic() {
 
 
 function playDuringPeriod(player: any, duration: number): void {
+    playing.value = true
     player.playVideo()
     clearInterval(interval.value);
     timeout.value = setTimeout(() => {
@@ -98,6 +101,7 @@ function getVolume(analyser: AnalyserNode) : number {
 
 <template>
   <div class="container-fluid">
+    <div class="overlay" v-if="listening && !playing"></div>
     <div class="row">
       <div class="col-xs-12 col-lg-6 offset-lg-3 player">
         <div v-if="!listening">
@@ -129,5 +133,15 @@ function getVolume(analyser: AnalyserNode) : number {
 <style scoped>
 .player{
   border:red 1px solid
+}
+.overlay{
+  background: rgba(0, 0, 0, 0.9);
+  position:fixed;
+  left:0;
+  right:0;
+  top:0;
+  bottom:0;
+  z-index: 999;
+  pointer-events: none;
 }
 </style>
