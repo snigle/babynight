@@ -3,6 +3,11 @@ import { computed, ref } from '@vue/reactivity';
 import { onMounted, onUnmounted } from '@vue/runtime-core';
 import { YoutubeVue3 } from "youtube-vue3";
 
+type SoundEvent = {
+volume: number
+date: Date
+};
+
 const micAnalyser = await getMicAnalyser()
 
 const playerNode = ref<typeof YoutubeVue3 | null>(null);
@@ -15,23 +20,32 @@ const listening = ref(false)
 const interval = ref(0)
 const timeout = ref(0) 
 const volume = ref(0)
-
+const history = ref<SoundEvent[]>([])
+var wakeLock : any = null;
 onUnmounted(() => {
     stopListeningMic()
 })
 
 // DOM methods
-function startListeningMic() {
+async function startListeningMic() {
   if (!playerNode.value) {
     return;
   }
   const player = playerNode.value.player;
   listening.value = true
+  try {
+    wakeLock = await (navigator as any).wakeLock.request('screen');
+  } catch(e) {
+    console.log("can't block lockscreen")
+  }
   interval.value = setInterval(() => {
         volume.value = getVolume(micAnalyser)
         if (volume.value > 0.04 ) {
-            console.log(volume)
             playDuringPeriod(player, 15 * 60 * 1000)
+            history.value.push({
+              date: new Date(),
+              volume: volume.value,
+            })
         }
       },200)
 }
@@ -39,6 +53,9 @@ function startListeningMic() {
 function stopListeningMic() {
   if (!playerNode.value) {
     return;
+  }
+  if (wakeLock) {
+    wakeLock.release().then(() => wakeLock = null);
   }
   listening.value = false;
   clearInterval(interval.value);
@@ -80,24 +97,37 @@ function getVolume(analyser: AnalyserNode) : number {
 </script>
 
 <template>
-      <div v-if="!listening">
-      <input type="text" v-model="url" />
-      <button class="btn btn-primary" @click="startListeningMic()">Activate</button>
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-xs-12 col-lg-6 offset-lg-3 player">
+        <div v-if="!listening">
+        <input type="text" v-model="url" />
+        <button class="btn btn-primary" @click="startListeningMic()">Activate</button>
+        </div>
+        <div v-else>
+        <button @click="stopListeningMic()">Stop</button>
+        <input :value="volume" />
+        </div>
+        <YoutubeVue3
+          ref="playerNode"
+          :videoid="videoId"
+          :loop="1"
+          :width="-1"
+          :height="320"
+          :autoplay="0"
+          :controls="1"
+        />
+
+        <div v-for="event,i in history" :key="i">
+          {{event.date.toLocaleTimeString()}}: {{event.volume}}
+        </div>
       </div>
-      <div v-else>
-      <button @click="stopListeningMic()">Stop</button>
-      <input :value="volume" />
-      </div>
-      <YoutubeVue3
-        ref="playerNode"
-        :videoid="videoId"
-        :loop="1"
-        :width="480"
-        :height="320"
-        :autoplay="0"
-        :controls="1"
-      />
+    </div>
+  </div>
 </template>
 
 <style scoped>
+.player{
+  border:red 1px solid
+}
 </style>
